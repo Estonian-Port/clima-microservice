@@ -43,9 +43,9 @@ class ClimaService(
 
         val weatherHourly = Clima(
             timestamp = now,
-            temperature = BigDecimal.valueOf(weatherData.main.temp),
-            humidity = weatherData.main.humidity,
-            isRaining = isRaining
+            temperatura = BigDecimal.valueOf(weatherData.main.temp),
+            humedad = weatherData.main.humidity,
+            estaLloviendo = isRaining
         )
 
         climaRepository.save(weatherHourly)
@@ -63,8 +63,8 @@ class ClimaService(
 
     private fun Clima.toDto() = ClimaResponse(
         timestamp = timestamp,
-        temperature = temperature,
-        humidity = humidity,
-        isRaining = isRaining
+        temperature = temperatura,
+        humidity = humedad,
+        isRaining = estaLloviendo
     )
 }

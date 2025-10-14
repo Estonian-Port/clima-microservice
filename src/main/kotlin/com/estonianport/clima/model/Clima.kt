@@ -14,11 +14,11 @@ class Clima(
     val timestamp: LocalDateTime,
 
     @Column(nullable = false, precision = 5, scale = 2)
-    val temperature: BigDecimal,
+    val temperatura: BigDecimal,
 
     @Column(nullable = false)
-    val humidity: Int,
+    val humedad: Int,
 
-    @Column(name = "is_raining", nullable = false)
-    val isRaining: Boolean
+    @Column(name = "esta_lloviendo", nullable = false)
+    val estaLloviendo: Boolean
 )

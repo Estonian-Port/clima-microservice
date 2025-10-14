@@ -10,7 +10,7 @@ class WebClientConfig {
     @Bean
     fun webClient(): WebClient {
         return WebClient.builder()
-            .baseUrl("https://api.openweathermap.org/data/2.5")
+            .baseUrl("https://api.openweathermap.org/data/2.5/weather")
             .build()
     }
 }

@@ -1,9 +1,10 @@
 package com.estonianport.clima.service
 
 import com.estonianport.clima.dto.OpenWeatherResponse
-import com.weather.microservice.dto.OpenWeatherResponse
+import com.estonianport.clima.properties.OpenWeatherConfig
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
@@ -15,7 +16,7 @@ private val logger = KotlinLogging.logger {}
 @Service
 class OpenWeatherService(
     private val webClient: WebClient,
-    @Value("\${openweather.api.key}") private val apiKey: String
+    private val openWeatherConfig: OpenWeatherConfig
 ) {
 
     companion object {
@@ -27,10 +28,10 @@ class OpenWeatherService(
         return try {
             webClient.get()
                 .uri { builder ->
-                    builder.path("/weather")
+                    builder
                         .queryParam("lat", BUENOS_AIRES_LAT)
                         .queryParam("lon", BUENOS_AIRES_LON)
-                        .queryParam("appid", apiKey)
+                        .queryParam("appid", openWeatherConfig.apiKey)
                         .queryParam("units", "metric")
                         .queryParam("lang", "es")
                         .build()
