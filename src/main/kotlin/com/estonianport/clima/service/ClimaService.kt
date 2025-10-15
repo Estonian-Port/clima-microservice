@@ -2,14 +2,15 @@ package com.estonianport.clima.service
 
 import com.estonianport.clima.repository.ClimaRepository
 import com.estonianport.clima.dto.ClimaResponse
+import com.estonianport.clima.dto.OpenWeatherResponse
 import com.estonianport.clima.model.Clima
+import com.estonianport.clima.model.enum.EstadoClimaType
 import mu.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
-
 private val logger = KotlinLogging.logger {}
 
 @Service
@@ -35,21 +36,21 @@ class ClimaService(
             return
         }
 
-        val isRaining = weatherData.weather.any {
-            it.main.equals("Rain", ignoreCase = true) ||
-                    it.main.equals("Drizzle", ignoreCase = true) ||
-                    it.main.equals("Thunderstorm", ignoreCase = true)
-        }
+        // Obtener el estado del clima basado en los datos de OpenWeather
+        val estadoClima = determineEstadoClima(weatherData.weather)
 
-        val weatherHourly = Clima(
+        val nuevoClima = Clima(
             timestamp = now,
             temperatura = BigDecimal.valueOf(weatherData.main.temp),
             humedad = weatherData.main.humidity,
-            estaLloviendo = isRaining
+            estadoClima = estadoClima
         )
 
-        climaRepository.save(weatherHourly)
-        logger.info { "Registro de clima guardado: temp=${weatherData.main.temp}°C, humedad=${weatherData.main.humidity}%, lluvia=$isRaining" }
+        climaRepository.save(nuevoClima)
+        logger.info {
+            "Registro de clima guardado: temp=${weatherData.main.temp}°C, " +
+                    "humedad=${weatherData.main.humidity}%, estado=$estadoClima"
+        }
     }
 
     fun getLatestWeather(): ClimaResponse? {
@@ -61,10 +62,43 @@ class ClimaService(
             .map { it.toDto() }
     }
 
+    /**
+     * Determina el estado del clima basado en la lista de condiciones de OpenWeather
+     * Prioriza: Tormenta > Lluvia > Nublado/Parcial > Soleado
+     */
+    private fun determineEstadoClima(weatherList: List<OpenWeatherResponse.Weather>): EstadoClimaType {
+        // Si hay múltiples condiciones, priorizamos la más severa
+
+        // 1. Verificar si hay tormenta (máxima prioridad)
+        weatherList.forEach { weather ->
+            if (weather.main.equals("Thunderstorm", ignoreCase = true)) {
+                return EstadoClimaType.TORMENTA
+            }
+        }
+
+        // 2. Verificar si hay lluvia
+        weatherList.forEach { weather ->
+            if (weather.main.equals("Rain", ignoreCase = true) ||
+                weather.main.equals("Drizzle", ignoreCase = true)) {
+                return EstadoClimaType.LLUVIA
+            }
+        }
+
+        // 3. Si no hay lluvia ni tormenta, usar la primera condición
+        return if (weatherList.isNotEmpty()) {
+            EstadoClimaType.fromWeatherCondition(weatherList[0].main, weatherList[0].description)
+        } else {
+            EstadoClimaType.NUBLADO // Por defecto
+        }
+    }
+
+    /**
+     * Extensión para convertir Clima a ClimaResponse
+     */
     private fun Clima.toDto() = ClimaResponse(
         timestamp = timestamp,
-        temperature = temperatura,
-        humidity = humedad,
-        isRaining = estaLloviendo
+        temperatura = temperatura,
+        humedad = humedad,
+        estadoClima = estadoClima
     )
 }

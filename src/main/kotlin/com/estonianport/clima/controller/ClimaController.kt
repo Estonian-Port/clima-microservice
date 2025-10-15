@@ -13,17 +13,17 @@ class ClimaController(
     private val climaService: ClimaService
 ) {
 
-    @GetMapping("/weather/latest")
+    @GetMapping("/clima/latest")
     fun getLatestWeather(): ResponseEntity<ClimaResponse> {
-        val weather = climaService.getLatestWeather()
-        return if (weather != null) {
-            ResponseEntity.ok(weather)
+        val clima = climaService.getLatestWeather()
+        return if (clima != null) {
+            ResponseEntity.ok(clima)
         } else {
             ResponseEntity.noContent().build()
         }
     }
 
-    @GetMapping("/weather")
+    @GetMapping("/clima")
     fun getWeatherHistory(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) from: LocalDateTime,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) to: LocalDateTime

@@ -1,4 +1,5 @@
 package com.estonianport.clima.model
+import com.estonianport.clima.model.enum.EstadoClimaType
 import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDateTime
@@ -19,6 +20,7 @@ class Clima(
     @Column(nullable = false)
     val humedad: Int,
 
-    @Column(name = "esta_lloviendo", nullable = false)
-    val estaLloviendo: Boolean
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_clima", nullable = false)
+    val estadoClima: EstadoClimaType
 )
