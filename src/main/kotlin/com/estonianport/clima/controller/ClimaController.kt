@@ -9,6 +9,7 @@ import java.time.LocalDateTime
 
 @RestController
 @RequestMapping
+@CrossOrigin("*")
 class ClimaController(
     private val climaService: ClimaService
 ) {
@@ -30,10 +31,5 @@ class ClimaController(
     ): ResponseEntity<List<ClimaResponse>> {
         val history = climaService.getWeatherHistory(from, to)
         return ResponseEntity.ok(history)
-    }
-
-    @GetMapping("/health")
-    fun health(): ResponseEntity<Map<String, String>> {
-        return ResponseEntity.ok(mapOf("status" to "UP"))
     }
 }
