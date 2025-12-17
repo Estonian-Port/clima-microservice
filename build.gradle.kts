@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.estonianport.clima"
-version = "0.1.0"
+version = "0.1.1"
 description = "Clima microservice"
 java.sourceCompatibility = JavaVersion.VERSION_17
 
