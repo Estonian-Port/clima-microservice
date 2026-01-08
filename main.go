@@ -29,18 +29,26 @@ type WeatherData struct {
 }
 
 var db *sql.DB
+var loc *time.Location
 
 var cities = []City{
 	{Name: "BuenosAires", Lat: -34.6037, Lon: -58.3816},
 }
 
 func main() {
-	// Cargar .env en local (Railway lo ignora)
+	// Cargar .env en local
 	if err := godotenv.Load(); err != nil {
 		log.Println("Aviso: no se encontró .env, usando entorno")
 	}
 
-	// Construir DATABASE_URL unificada
+	// Timezone Buenos Aires
+	var err error
+	loc, err = time.LoadLocation("America/Argentina/Buenos_Aires")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// DATABASE_URL unificada (local + Railway)
 	dbURL := fmt.Sprintf(
 		"postgresql://%s:%s@%s:%s/%s?sslmode=disable",
 		os.Getenv("POSTGRES_USER"),
@@ -50,7 +58,6 @@ func main() {
 		os.Getenv("POSTGRES_DB"),
 	)
 
-	var err error
 	db, err = sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatal("Error abriendo DB:", err)
@@ -61,10 +68,15 @@ func main() {
 		log.Fatal("No se pudo conectar a la DB:", err)
 	}
 
-	// Worker horario exacto
+	// Worker horario
 	go hourlyWorker()
 
-	http.HandleFunc("/clima/latest", getLatestWeatherHandler)
+	// Router
+	mux := http.NewServeMux()
+	mux.HandleFunc("/clima/latest", getLatestWeatherHandler)
+
+	// CORS
+	handler := cors(mux)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -74,27 +86,47 @@ func main() {
 	printBanner(port)
 
 	log.Println("Servidor iniciado con éxito")
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Fatal(http.ListenAndServe(":"+port, handler))
 }
+
+/* =========================
+   CORS
+========================= */
+
+func cors(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+/* =========================
+   WORKER HORARIO
+========================= */
 
 func hourlyWorker() {
 	for {
-		loc, err := time.LoadLocation("America/Argentina/Buenos_Aires")
-		if err != nil {
-			log.Fatal(err)
-		}
-
 		now := time.Now().In(loc)
 		next := now.Truncate(time.Hour).Add(time.Hour)
-		wait := time.Until(next)
-
-		time.Sleep(wait)
+		time.Sleep(time.Until(next))
 
 		for _, city := range cities {
 			updateWeather(city)
 		}
 	}
 }
+
+/* =========================
+   WEATHER
+========================= */
 
 func mapCondition(apiCondition string) string {
 	switch apiCondition {
@@ -161,10 +193,18 @@ func updateWeather(city City) {
 
 	estado := mapCondition(result.Weather[0].Main)
 
+	// Hora local en punto (sin segundos ni millis)
+	now := time.Now().In(loc)
+	now = time.Date(
+		now.Year(), now.Month(), now.Day(),
+		now.Hour(), 0, 0, 0,
+		loc,
+	)
+
 	_, err = db.Exec(
 		`INSERT INTO clima (timestamp, temperatura, humedad, estado_clima)
 		 VALUES ($1, $2, $3, $4)`,
-		time.Now(),
+		now,
 		result.Main.Temp,
 		result.Main.Humidity,
 		estado,
@@ -172,10 +212,12 @@ func updateWeather(city City) {
 
 	if err != nil {
 		log.Println("Error SQL:", err)
-		return
 	}
-
 }
+
+/* =========================
+   HANDLER
+========================= */
 
 func getLatestWeatherHandler(w http.ResponseWriter, r *http.Request) {
 	var data WeatherData
@@ -200,14 +242,18 @@ func getLatestWeatherHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(data)
 }
 
+/* =========================
+   BANNER
+========================= */
+
 func printBanner(port string) {
 	const green = "\033[32m"
 	const reset = "\033[0m"
 	const bold = "\033[1m"
 
 	fmt.Printf(green + `
-     _____  _     _____ __  ___  ___     ___  ________ _____ ______ _____ _____ ___________ _   _ _____ _____  _____
-    /  __ \| |   |_   _|  \/  | / _ \    |  \/  |_   _/  __ \| ___ \  _  /  ___|  ___| ___ \ | | |_   _/  __ \|  ___|
+     _____  _     _____ __  ___  ___     ___  ________ _____ ______ _____ _____ ___________ _   _ _____ _____  ____
+    /  __ \| |   |_   _|  \/  | / _ \    |  \/  |_   _/  __ \| ___ \  _  /  ___|  ___| ___ \ | | |_   _/  __ \|  __|
     | /  \/| |     | | | .  . |/ /_\ \   | .  . | | | | /  \/| |_/ / | | \ ` + "`" + `--.| |__ | |_/ / | | | | | | /  \/| |__ 
     | |    | |     | | | |\/| ||  _  |   | |\/| | | | | |    |    /| | | |` + "`" + `--. \  __||    /| | | | | | | |    |  __|
     | \__/\| |_____| |_| |  | || | | |   | |  | |_| |_| \__/\| |\ \\ \_/ /\__/ / |___| |\ \\ \_/ /_| |_| \__/\| |___
@@ -218,4 +264,3 @@ func printBanner(port string) {
 	fmt.Printf("· %sPowered by Go%s :: ·························%s(v%s)%s\n", green, reset, bold, runtime.Version(), reset)
 	fmt.Printf("· %sPort%s :: ··································%s(%s)%s\n\n", green, reset, bold, port, reset)
 }
-
