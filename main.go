@@ -79,7 +79,12 @@ func main() {
 
 func hourlyWorker() {
 	for {
-		now := time.Now()
+		loc, err := time.LoadLocation("America/Argentina/Buenos_Aires")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		now := time.Now().In(loc)
 		next := now.Truncate(time.Hour).Add(time.Hour)
 		wait := time.Until(next)
 
